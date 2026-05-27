@@ -1,0 +1,152 @@
+{% extends 'base.html' %}
+{% load analyzer_tags %}
+{% block title %}Hot Path Detection{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold"><i class="bi bi-fire me-2" style="color:#f59e0b;"></i>Hot Path Detection & Profiling</h3>
+            <p class="text-muted mb-0">{{ submission.title }}</p>
+        </div>
+        <a href="{% url 'analysis_select' submission.pk %}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i>Back
+        </a>
+    </div>
+
+    {% if results.success %}
+    <!-- Summary -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="stat-card" style="border-left-color:#f59e0b;">
+                <div class="stat-value">{{ results.total_time }} ms</div>
+                <div class="stat-label">Total Execution Time</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card" style="border-left-color:#4f46e5;">
+                <div class="stat-value">{{ results.total_calls }}</div>
+                <div class="stat-label">Total Function Calls</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card" style="border-left-color:#ef4444;">
+                <div class="stat-value">{{ results.hot_functions|length }}</div>
+                <div class="stat-label">Hot Functions</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card" style="border-left-color:#8b5cf6;">
+                <div class="stat-value">{{ results.bottlenecks|length }}</div>
+                <div class="stat-label">Bottlenecks Found</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Call Frequency Chart -->
+        <div class="col-lg-6">
+            <div class="chart-container">
+                <canvas id="callFreqChart" height="300"></canvas>
+            </div>
+        </div>
+
+        <!-- Timeline Chart -->
+        <div class="col-lg-6">
+            <div class="chart-container">
+                <canvas id="timelineChart" height="300"></canvas>
+            </div>
+        </div>
+
+        <!-- Hot Functions Table -->
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header"><i class="bi bi-fire me-2 text-danger"></i>Hot Functions</div>
+                <div class="card-body p-0">
+                    <table class="table table-sm table-analysis mb-0">
+                        <thead><tr><th>Function</th><th>Calls</th><th>Total (ms)</th><th>Per Call (ms)</th></tr></thead>
+                        <tbody>
+                            {% for f in results.hot_functions %}
+                            <tr>
+                                <td><code class="text-danger">{{ f.function }}</code></td>
+                                <td>{{ f.ncalls }}</td>
+                                <td>{{ f.cumtime_ms }}</td>
+                                <td>{{ f.percall_ms }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottlenecks -->
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header"><i class="bi bi-exclamation-triangle me-2 text-warning"></i>Bottleneck Detection</div>
+                <div class="card-body">
+                    {% for b in results.bottlenecks %}
+                    <div class="alert alert-{{ b.severity|default:'warning' }} py-2 mb-2" style="{% if b.severity == 'high' %}border-left:4px solid #ef4444;{% else %}border-left:4px solid #f59e0b;{% endif %}">
+                        <strong>{{ b.function }}</strong> - {{ b.time_ms }} ms ({{ b.calls }} calls)
+                        <br><small>{{ b.suggestion }}</small>
+                    </div>
+                    {% empty %}
+                    <p class="text-muted mb-0"><i class="bi bi-check-circle text-success me-1"></i>No significant bottlenecks detected.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Full Profile Stats -->
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header"><i class="bi bi-table me-2"></i>Full Profile Statistics</div>
+                <div class="card-body p-0" style="max-height:400px;overflow-y:auto;">
+                    <table class="table table-sm table-analysis table-hover mb-0">
+                        <thead><tr><th>Function</th><th>File</th><th>Line</th><th>Calls</th><th>Tot Time (ms)</th><th>Cum Time (ms)</th><th>Per Call (ms)</th></tr></thead>
+                        <tbody>
+                            {% for s in results.profile_stats %}
+                            <tr>
+                                <td><code>{{ s.function }}</code></td>
+                                <td class="text-muted small">{{ s.file|truncatechars:30 }}</td>
+                                <td>{{ s.line }}</td>
+                                <td>{{ s.ncalls }}</td>
+                                <td>{{ s.tottime_ms }}</td>
+                                <td>{{ s.cumtime_ms }}</td>
+                                <td>{{ s.percall_ms }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% else %}
+    <div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>{{ results.error }}</div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+{% if results.success %}
+const callFreq = {{ results.call_frequency|to_json }};
+createBarChart('callFreqChart',
+    Object.keys(callFreq),
+    Object.values(callFreq),
+    'Function Call Frequency',
+    Object.values(callFreq).map((_, i) => `hsl(${(i * 30) % 360}, 70%, 55%)`)
+);
+
+const timeline = {{ results.execution_timeline|to_json }};
+createBarChart('timelineChart',
+    timeline.map(t => t.function),
+    timeline.map(t => t.duration_ms),
+    'Execution Timeline (ms)',
+    'rgba(245, 158, 11, 0.7)'
+);
+{% endif %}
+</script>
+{% endblock %}

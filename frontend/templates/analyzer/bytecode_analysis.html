@@ -1,0 +1,150 @@
+{% extends 'base.html' %}
+{% load analyzer_tags %}
+{% block title %}Bytecode Analysis{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold"><i class="bi bi-braces me-2 text-primary"></i>Bytecode Compilation Analysis</h3>
+            <p class="text-muted mb-0">{{ submission.title }}</p>
+        </div>
+        <a href="{% url 'analysis_select' submission.pk %}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i>Back
+        </a>
+    </div>
+
+    {% if results.success %}
+    <!-- Summary Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="stat-card" style="border-left-color:#4f46e5;">
+                <div class="stat-value">{{ results.total_instructions }}</div>
+                <div class="stat-label">Total Instructions</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card" style="border-left-color:#10b981;">
+                <div class="stat-value">{{ results.compilation_time }} ms</div>
+                <div class="stat-label">Compilation Time</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card" style="border-left-color:#f59e0b;">
+                <div class="stat-value">{{ results.opcode_frequency|length }}</div>
+                <div class="stat-label">Unique Opcodes</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card" style="border-left-color:#8b5cf6;">
+                <div class="stat-value">{{ results.execution_comparison.speedup }}x</div>
+                <div class="stat-label">Compiled Speedup</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Bytecode Instructions -->
+        <div class="col-lg-7">
+            <div class="card">
+                <div class="card-header"><i class="bi bi-terminal me-2"></i>Bytecode Instructions</div>
+                <div class="card-body p-0">
+                    <div class="bytecode-display">
+                        <table class="table table-sm table-dark mb-0" style="font-size:0.78rem;">
+                            <thead>
+                                <tr><th>Offset</th><th>Line</th><th>Opcode</th><th>Arg</th><th>Value</th></tr>
+                            </thead>
+                            <tbody>
+                                {% for instr in results.bytecode_instructions %}
+                                <tr>
+                                    <td class="line-num">{{ instr.offset }}</td>
+                                    <td>{{ instr.line }}</td>
+                                    <td class="opname">{{ instr.opname }}</td>
+                                    <td class="arg">{{ instr.arg }}</td>
+                                    <td>{{ instr.argval|truncatechars:40 }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Column -->
+        <div class="col-lg-5">
+            <!-- Opcode Frequency Chart -->
+            <div class="chart-container mb-4">
+                <canvas id="opcodeChart" height="300"></canvas>
+            </div>
+
+            <!-- Execution Comparison -->
+            <div class="chart-container mb-4">
+                <canvas id="execCompare" height="200"></canvas>
+            </div>
+
+            <!-- Constants & Names -->
+            <div class="card">
+                <div class="card-header"><i class="bi bi-list-ul me-2"></i>Code Objects</div>
+                <div class="card-body">
+                    <h6 class="fw-bold">Constants</h6>
+                    <div class="d-flex flex-wrap gap-1 mb-3">
+                        {% for c in results.constants %}
+                        <span class="badge bg-primary-soft">{{ c|truncatechars:30 }}</span>
+                        {% endfor %}
+                    </div>
+                    <h6 class="fw-bold">Names</h6>
+                    <div class="d-flex flex-wrap gap-1">
+                        {% for n in results.names %}
+                        <span class="badge bg-success-soft">{{ n }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Nested Functions -->
+    {% if results.nested_functions %}
+    <div class="card mt-4">
+        <div class="card-header"><i class="bi bi-diagram-2 me-2"></i>Nested Function Bytecode</div>
+        <div class="card-body">
+            {% for func in results.nested_functions %}
+            <h6 class="fw-bold mt-2">{{ func.name }} <span class="badge bg-secondary">{{ func.instruction_count }} instructions</span></h6>
+            <pre class="bytecode-display" style="max-height:200px;">{{ func.bytecode }}</pre>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="alert alert-danger">
+        <i class="bi bi-exclamation-triangle me-2"></i>{{ results.error }}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+{% if results.success %}
+// Opcode Frequency Chart
+const opcodeData = {{ results.opcode_frequency|to_json }};
+createBarChart('opcodeChart',
+    Object.keys(opcodeData),
+    Object.values(opcodeData),
+    'Opcode Frequency Distribution',
+    Object.values(opcodeData).map((_, i) => `hsl(${(i * 25) % 360}, 70%, 55%)`)
+);
+
+// Execution Comparison
+const execData = {{ results.execution_comparison|to_json }};
+createBarChart('execCompare',
+    ['Interpreted', 'Pre-compiled'],
+    [execData.interpreted_ms, execData.compiled_ms],
+    'Interpreted vs Compiled Execution (ms)',
+    ['rgba(239,68,68,0.7)', 'rgba(16,185,129,0.7)']
+);
+{% endif %}
+</script>
+{% endblock %}

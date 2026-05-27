@@ -1,0 +1,202 @@
+{% extends 'base.html' %}
+{% load analyzer_tags %}
+{% block title %}Concurrency Analysis{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold"><i class="bi bi-diagram-3 me-2 text-primary"></i>Concurrency & Parallelism Analysis</h3>
+            <p class="text-muted mb-0">{{ submission.title }}</p>
+        </div>
+        <a href="{% url 'analysis_select' submission.pk %}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i>Back
+        </a>
+    </div>
+
+    {% if results.success %}
+    <!-- Comparison Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="stat-card" style="border-left-color:#64748b;">
+                <div class="stat-value" style="font-size:1.2rem;">{{ results.comparison.sequential_ms }} ms</div>
+                <div class="stat-label">Sequential</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card" style="border-left-color:#4f46e5;">
+                <div class="stat-value" style="font-size:1.2rem;">{{ results.comparison.threading_ms }} ms</div>
+                <div class="stat-label">Threading</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card" style="border-left-color:#10b981;">
+                <div class="stat-value" style="font-size:1.2rem;">{{ results.comparison.async_ms }} ms</div>
+                <div class="stat-label">Async</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card" style="border-left-color:#f59e0b;">
+                <div class="stat-value" style="font-size:1.2rem;">{{ results.comparison.best_approach }}</div>
+                <div class="stat-label">Best Approach</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Performance Comparison Chart -->
+        <div class="col-lg-6">
+            <div class="chart-container">
+                <canvas id="concurrencyCompare" height="300"></canvas>
+            </div>
+        </div>
+
+        <!-- CPU Utilization -->
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header"><i class="bi bi-cpu me-2"></i>CPU Utilization Estimates</div>
+                <div class="card-body">
+                    {% for mode, util in results.cpu_utilization.items %}
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="fw-medium">{{ mode|title }}</span>
+                            <span class="text-muted small">{{ util }}</span>
+                        </div>
+                        <div class="progress" style="height:12px;">
+                            {% if 'sequential' in mode %}
+                            <div class="progress-bar bg-secondary" style="width:25%"></div>
+                            {% elif 'threaded' in mode %}
+                            <div class="progress-bar bg-primary" style="width:50%"></div>
+                            {% elif 'multiprocess' in mode %}
+                            <div class="progress-bar bg-success" style="width:95%"></div>
+                            {% else %}
+                            <div class="progress-bar bg-info" style="width:25%"></div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Threading Details -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header bg-primary bg-opacity-10"><i class="bi bi-layers me-2"></i>Threading Results</div>
+                <div class="card-body">
+                    <table class="table table-sm table-analysis">
+                        <tr><td>Total Time</td><td class="fw-bold">{{ results.threading_results.total_time_ms }} ms</td></tr>
+                        <tr><td>Thread Count</td><td class="fw-bold">{{ results.threading_results.thread_count }}</td></tr>
+                        <tr><td>Avg Thread Time</td><td class="fw-bold">{{ results.threading_results.avg_thread_time_ms }} ms</td></tr>
+                        <tr><td>Speedup</td><td class="fw-bold">{{ results.threading_results.speedup_vs_sequential }}x</td></tr>
+                        <tr><td>Overhead</td><td class="fw-bold">{{ results.threading_results.overhead_ms }} ms</td></tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Async Details -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header bg-success bg-opacity-10"><i class="bi bi-arrow-repeat me-2"></i>Async Results</div>
+                <div class="card-body">
+                    <table class="table table-sm table-analysis">
+                        <tr><td>Total Time</td><td class="fw-bold">{{ results.async_results.total_time_ms }} ms</td></tr>
+                        <tr><td>Task Count</td><td class="fw-bold">{{ results.async_results.task_count }}</td></tr>
+                        <tr><td>Avg Task Time</td><td class="fw-bold">{{ results.async_results.avg_task_time_ms }} ms</td></tr>
+                        <tr><td>Speedup</td><td class="fw-bold">{{ results.async_results.speedup_vs_sequential }}x</td></tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Multiprocessing -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header bg-warning bg-opacity-10"><i class="bi bi-grid-3x3 me-2"></i>Multiprocessing</div>
+                <div class="card-body">
+                    <table class="table table-sm table-analysis">
+                        <tr><td>Estimated Time</td><td class="fw-bold">{{ results.multiprocessing_results.estimated_time_ms }} ms</td></tr>
+                        <tr><td>Process Count</td><td class="fw-bold">{{ results.multiprocessing_results.process_count }}</td></tr>
+                        <tr><td>Est. Speedup</td><td class="fw-bold">{{ results.multiprocessing_results.estimated_speedup }}x</td></tr>
+                        <tr><td>Overhead</td><td class="fw-bold">{{ results.multiprocessing_results.overhead_ms }} ms</td></tr>
+                    </table>
+                    <small class="text-muted">{{ results.multiprocessing_results.note }}</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Race Condition Analysis -->
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header"><i class="bi bi-exclamation-diamond me-2 text-danger"></i>Race Condition Simulation</div>
+                <div class="card-body">
+                    <div class="row text-center mb-3">
+                        <div class="col-4">
+                            <div class="fw-bold text-muted">Expected</div>
+                            <div class="h4 fw-bold">{{ results.race_condition_analysis.expected_value }}</div>
+                        </div>
+                        <div class="col-4">
+                            <div class="fw-bold text-danger">Unsafe</div>
+                            <div class="h4 fw-bold text-danger">{{ results.race_condition_analysis.unsafe_value }}</div>
+                        </div>
+                        <div class="col-4">
+                            <div class="fw-bold text-success">Safe (Locked)</div>
+                            <div class="h4 fw-bold text-success">{{ results.race_condition_analysis.safe_value }}</div>
+                        </div>
+                    </div>
+                    {% if results.race_condition_analysis.race_detected %}
+                    <div class="alert alert-danger py-2 mb-0">
+                        <i class="bi bi-bug me-1"></i>
+                        Race condition detected! Data loss: <strong>{{ results.race_condition_analysis.data_loss_percent }}%</strong>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-success py-2 mb-0">
+                        <i class="bi bi-check-circle me-1"></i>No data corruption detected in this run.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Deadlock Analysis -->
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header"><i class="bi bi-lock me-2 text-warning"></i>Deadlock Analysis</div>
+                <div class="card-body">
+                    <p><strong>Shared Resources:</strong> {{ results.deadlock_analysis.shared_resources_detected }}</p>
+                    {% if results.deadlock_analysis.potential_deadlocks %}
+                    {% for d in results.deadlock_analysis.potential_deadlocks %}
+                    <div class="alert alert-warning py-2">
+                        Line {{ d.line }}: {{ d.pattern }} (Risk: {{ d.risk }})
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="alert alert-success py-2 mb-0">
+                        <i class="bi bi-check-circle me-1"></i>No obvious deadlock patterns detected.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% else %}
+    <div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>{{ results.error }}</div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+{% if results.success %}
+const comparison = {{ results.comparison|to_json }};
+createBarChart('concurrencyCompare',
+    ['Sequential', 'Threading', 'Thread Pool', 'Async', 'Multiprocessing (Est.)'],
+    [comparison.sequential_ms, comparison.threading_ms, comparison.thread_pool_ms, comparison.async_ms, comparison.multiprocessing_estimated_ms],
+    'Concurrency Model Comparison (ms)',
+    ['#64748b', '#4f46e5', '#8b5cf6', '#10b981', '#f59e0b']
+);
+{% endif %}
+</script>
+{% endblock %}

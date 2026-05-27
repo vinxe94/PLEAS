@@ -1,0 +1,159 @@
+{% extends 'base.html' %}
+{% load analyzer_tags %}
+{% block title %}Runtime Efficiency{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold"><i class="bi bi-speedometer2 me-2 text-info"></i>Runtime Efficiency Analyzer</h3>
+            <p class="text-muted mb-0">{{ submission.title }}</p>
+        </div>
+        <a href="{% url 'analysis_select' submission.pk %}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i>Back
+        </a>
+    </div>
+
+    {% if results.success %}
+    <!-- Performance Tier -->
+    <div class="text-center mb-4">
+        <div class="d-inline-block p-4 rounded-3" style="background:linear-gradient(135deg,#4f46e5,#8b5cf6);color:white;">
+            <h2 class="mb-1 fw-bold">Tier {{ results.rankings.tier }}</h2>
+            <p class="mb-0 opacity-75">Overall Score: {{ results.rankings.overall_score }}/100</p>
+        </div>
+    </div>
+
+    <!-- Metrics Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-2 col-sm-4">
+            <div class="stat-card text-center" style="border-left-color:#4f46e5;">
+                <div class="stat-value" style="font-size:1.3rem;">{{ results.execution_time.avg_ms }}</div>
+                <div class="stat-label">Avg Time (ms)</div>
+            </div>
+        </div>
+        <div class="col-md-2 col-sm-4">
+            <div class="stat-card text-center" style="border-left-color:#10b981;">
+                <div class="stat-value" style="font-size:1.3rem;">{{ results.startup_time }}</div>
+                <div class="stat-label">Startup (ms)</div>
+            </div>
+        </div>
+        <div class="col-md-2 col-sm-4">
+            <div class="stat-card text-center" style="border-left-color:#0ea5e9;">
+                <div class="stat-value" style="font-size:1.3rem;">{{ results.throughput.executions_per_second }}</div>
+                <div class="stat-label">Ops/sec</div>
+            </div>
+        </div>
+        <div class="col-md-2 col-sm-4">
+            <div class="stat-card text-center" style="border-left-color:#f59e0b;">
+                <div class="stat-value" style="font-size:1.3rem;">{{ results.execution_time.min_ms }}</div>
+                <div class="stat-label">Best (ms)</div>
+            </div>
+        </div>
+        <div class="col-md-2 col-sm-4">
+            <div class="stat-card text-center" style="border-left-color:#ef4444;">
+                <div class="stat-value" style="font-size:1.3rem;">{{ results.execution_time.max_ms }}</div>
+                <div class="stat-label">Worst (ms)</div>
+            </div>
+        </div>
+        <div class="col-md-2 col-sm-4">
+            <div class="stat-card text-center" style="border-left-color:#8b5cf6;">
+                <div class="stat-value" style="font-size:1.3rem;">{{ results.statistics.stdev }}</div>
+                <div class="stat-label">Std Dev (ms)</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Benchmark Results -->
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header"><i class="bi bi-bar-chart me-2"></i>Benchmark Results</div>
+                <div class="card-body">
+                    {% for b in results.benchmark_results %}
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="fw-medium">{{ b.metric }}</span>
+                            <span class="badge bg-{{ b.rating.color }}">{{ b.rating.label }}</span>
+                        </div>
+                        <div class="progress" style="height:10px;">
+                            <div class="progress-bar bg-{{ b.rating.color }}" style="width:{{ b.rating.score }}%"></div>
+                        </div>
+                        <small class="text-muted">{{ b.value }} {{ b.unit }}</small>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics Chart -->
+        <div class="col-lg-6">
+            <div class="chart-container mb-4">
+                <canvas id="statsChart" height="250"></canvas>
+            </div>
+            <div class="chart-container">
+                <canvas id="benchmarkRadar" height="250"></canvas>
+            </div>
+        </div>
+
+        <!-- Detailed Statistics -->
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header"><i class="bi bi-table me-2"></i>Detailed Statistics</div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <table class="table table-analysis">
+                                <tr><td>Mean</td><td class="fw-bold">{{ results.statistics.mean }} ms</td></tr>
+                                <tr><td>Standard Deviation</td><td class="fw-bold">{{ results.statistics.stdev }} ms</td></tr>
+                                <tr><td>Variance</td><td class="fw-bold">{{ results.statistics.variance }} ms²</td></tr>
+                                <tr><td>P95 Latency</td><td class="fw-bold">{{ results.statistics.p95 }} ms</td></tr>
+                                <tr><td>P99 Latency</td><td class="fw-bold">{{ results.statistics.p99 }} ms</td></tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <table class="table table-analysis">
+                                <tr><td>Iterations</td><td class="fw-bold">{{ results.execution_time.iterations }}</td></tr>
+                                <tr><td>Median</td><td class="fw-bold">{{ results.execution_time.median_ms }} ms</td></tr>
+                                <tr><td>Throughput</td><td class="fw-bold">{{ results.throughput.executions_per_second }} ops/s</td></tr>
+                                <tr><td>Avg Response</td><td class="fw-bold">{{ results.throughput.avg_response_time_ms }} ms</td></tr>
+                                <tr><td>Startup Time</td><td class="fw-bold">{{ results.startup_time }} ms</td></tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% else %}
+    <div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>{{ results.error }}</div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+{% if results.success %}
+createBarChart('statsChart',
+    ['Min', 'Mean', 'Median', 'P95', 'P99', 'Max'],
+    [{{ results.execution_time.min_ms }}, {{ results.statistics.mean }}, {{ results.execution_time.median_ms }}, {{ results.statistics.p95 }}, {{ results.statistics.p99 }}, {{ results.execution_time.max_ms }}],
+    'Execution Time Distribution (ms)',
+    ['#10b981', '#4f46e5', '#0ea5e9', '#f59e0b', '#ef4444', '#ef4444']
+);
+
+const scores = {{ results.rankings.category_scores|to_json }};
+createRadarChart('benchmarkRadar',
+    Object.keys(scores),
+    [{
+        label: 'Performance Score',
+        data: Object.values(scores),
+        backgroundColor: 'rgba(79, 70, 229, 0.2)',
+        borderColor: '#4f46e5',
+        borderWidth: 2,
+        pointBackgroundColor: '#4f46e5',
+    }],
+    'Performance Radar'
+);
+{% endif %}
+</script>
+{% endblock %}
